@@ -1,6 +1,22 @@
 ---
 layout: default
-title: My Portfolio
+title: Test Page
+permalink: /test/
 ---
-# Welcome
-This is my first Jekyll site on GitHub Pages.
+
+
+# Test Page
+
+
+This is a test page for my Jekyll site.
+
+
+You can add more content here, including lists, images, and links:
+
+
+- Item 1
+- Item 2
+- Item 3
+
+
+[Go back home]({{ site.baseurl }}/)
