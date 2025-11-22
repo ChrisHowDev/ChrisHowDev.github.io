@@ -7,3 +7,7 @@ url: "https://chrishowdev.github.io/" # your GitHub Pages URL
 destination: ./_site
 markdown: kramdown
 theme: jekyll-theme-minimal
+
+sidebar:
+  title: "Sample Title"
+  nav: test.md
