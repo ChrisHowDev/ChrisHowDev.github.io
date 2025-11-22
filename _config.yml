@@ -6,4 +6,4 @@ url: "https://chrishowdev.github.io/" # your GitHub Pages URL
 # Build settings
 destination: ./_site
 markdown: kramdown
-theme: jekyll-theme-minimal
+theme: jekyll-theme-minima
