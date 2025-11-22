@@ -10,4 +10,4 @@ theme: jekyll-theme-minimal
 
 sidebar:
   title: "Sample Title"
-  nav: test.md
+  nav: /test/
