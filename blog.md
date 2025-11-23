@@ -4,7 +4,7 @@
 
 ## [Live Demo](https://ruby-steep-kilometer.glitch.me/) 🔴
 
-![](https://github.com/ChrisHow9/WebGLProcedualGrass/blob/main/readme/grass.gif)
+![](https://raw.githubusercontent.com/ChrisHow9/WebGLProcedualGrass/main/readme/grass.gif)
 *Grass in action* 
 
 
