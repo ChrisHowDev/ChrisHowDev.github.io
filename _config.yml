@@ -12,7 +12,9 @@ markdown: kramdown
 remote_theme: vaibhavvikas/jekyll-theme-minimalistic
 
 navigation:
-  - name: Readme
+  - name: Resume
     link: /test/
-  - name: Another Page
-    link: index.html
+  - name: Projects
+    link: /index/
+  - name: Blog
+    link: /index/
