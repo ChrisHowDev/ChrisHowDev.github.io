@@ -16,10 +16,9 @@
 
   <div class="sidebar">
     <h2>My Portfolio</h2>
-    <a href="#" onclick="loadPage('test.md')">Home</a>
-    <a href="#" onclick="loadPage('grass.md')">Projects</a>
-    <a href="#" onclick="loadPage('index.md')">Resume</a>
-    <a href="#" onclick="loadPage('blog.md')">Contact</a>
+    <a href="#" onclick="loadPage('index.md')">Home</a>
+    <a href="#" onclick="loadPage('test.md')">Test</a>
+    <a href="#" onclick="loadPage('blog.md')">Blog</a>
   </div>
 
   <div class="content" id="content">
@@ -30,13 +29,18 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
     async function loadPage(page) {
-      const response = await fetch(page);
-      const md = await response.text();
-      document.getElementById('content').innerHTML = marked.parse(md);
+      try {
+        const response = await fetch(page);
+        if (!response.ok) throw new Error('Page not found');
+        const md = await response.text();
+        document.getElementById('content').innerHTML = marked.parse(md);
+      } catch (err) {
+        document.getElementById('content').innerHTML = `<p>Error loading page: ${err}</p>`;
+      }
     }
 
     // Load home page by default
-    loadPage('home.md');
+    loadPage('index.md');
   </script>
 
 </body>
