@@ -3,6 +3,9 @@ description: A simple portfolio site built with Jekyll
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://chrishowdev.github.io/" # your GitHub Pages URL
 
+plugins:
+  - jekyll-remote-theme
+  
 # Build settings
 destination: ./_site
 markdown: kramdown
