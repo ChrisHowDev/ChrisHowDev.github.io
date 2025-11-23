@@ -11,6 +11,14 @@ destination: ./_site
 markdown: kramdown
 remote_theme: vaibhavvikas/jekyll-theme-minimalistic
 
+platforms:
+  - name: GitHub
+    icon: <i class="fa-brands fa-github"></i>
+    link: https://github.com/vaibhavvikas
+  - name: LinkedIn
+    icon: <i class="fa-brands fa-linkedin"></i>
+    link: https://www.linkedin.com/in/vaibhavvikas
+    
 navigation:
   - name: Resume
     link: /test/
