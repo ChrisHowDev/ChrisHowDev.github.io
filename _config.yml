@@ -26,8 +26,3 @@ navigation:
     link: /index.html
   - name: Blog
     link: /grass/
-  sublist:
-      - name: Image
-        link: /index.html
-      - name: Image
-        link: /index.html
