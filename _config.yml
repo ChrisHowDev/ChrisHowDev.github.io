@@ -15,6 +15,6 @@ navigation:
   - name: Resume
     link: /test/
   - name: Projects
-    link: /index/
+    link: /index.html
   - name: Blog
-    link: /index/
+    link: /index.html
