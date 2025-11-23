@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Portfolio</title>
+  <style>
+    body { display: flex; margin: 0; font-family: Arial, sans-serif; }
+    .sidebar { width: 220px; background: #222; color: #fff; padding: 20px; }
+    .sidebar a { display: block; color: #fff; text-decoration: none; padding: 10px 0; }
+    .sidebar a:hover { background: #444; }
+    .content { flex: 1; padding: 20px; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h2>My Portfolio</h2>
+    <a href="#" onclick="loadPage('test.md')">Home</a>
+    <a href="#" onclick="loadPage('grass.md')">Projects</a>
+    <a href="#" onclick="loadPage('index.md')">Resume</a>
+    <a href="#" onclick="loadPage('blog.md')">Contact</a>
+  </div>
+
+  <div class="content" id="content">
+    Loading...
+  </div>
+
+  <!-- Load Markdown parser -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    async function loadPage(page) {
+      const response = await fetch(page);
+      const md = await response.text();
+      document.getElementById('content').innerHTML = marked.parse(md);
+    }
+
+    // Load home page by default
+    loadPage('home.md');
+  </script>
+
+</body>
+</html>
