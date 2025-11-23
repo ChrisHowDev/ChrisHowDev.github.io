@@ -8,6 +8,8 @@ destination: ./_site
 markdown: kramdown
 theme: jekyll-theme-minimal
 
-sidebar:
-  title: "Sample Title"
-  nav: /test/
+navigation:
+  - name: Readme
+    link: ./test.md
+  - name: Another Page
+    link: ./another-page.html
