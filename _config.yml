@@ -25,7 +25,7 @@ navigation:
   - name: Projects
     link: /index.html
   - name: Blog
-    link: /index.html
+    link: /blog.html
   sublist:
       - name: Image
         link: /index.html
