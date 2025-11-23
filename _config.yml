@@ -12,4 +12,4 @@ navigation:
   - name: Readme
     link: ./test.html
   - name: Another Page
-    link: another-page.html
+    link: test.html
