@@ -18,3 +18,8 @@ navigation:
     link: /index.html
   - name: Blog
     link: /index.html
+  sublist:
+      - name: Image
+        link: ./index.html#small-image
+      - name: Image
+        link: ./index.html#small-image
