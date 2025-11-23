@@ -13,6 +13,6 @@ remote_theme: vaibhavvikas/jekyll-theme-minimalistic
 
 navigation:
   - name: Readme
-    link: ./test.html
+    link: test.html
   - name: Another Page
-    link: ./index.html
+    link: index.html
