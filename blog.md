@@ -1,8 +1,3 @@
----
-layout: default
-title: grass Page
-permalink: /grass/
----
 
 
 # Procedual grass modeling and rending using quadratic bezier curves
