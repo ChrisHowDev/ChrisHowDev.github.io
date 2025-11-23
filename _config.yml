@@ -10,6 +10,6 @@ theme: jekyll-theme-minimal
 
 navigation:
   - name: Readme
-    link: ./test.md
+    link: ./test.html
   - name: Another Page
     link: another-page.html
