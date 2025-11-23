@@ -28,6 +28,6 @@ navigation:
     link: /index.html
   sublist:
       - name: Image
-        link: ./index.html
+        link: /index.html
       - name: Image
-        link: ./index.html
+        link: /index.html
