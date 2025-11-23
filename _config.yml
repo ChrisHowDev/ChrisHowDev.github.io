@@ -20,6 +20,6 @@ navigation:
     link: /index.html
   sublist:
       - name: Image
-        link: ./index.html#small-image
+        link: ./index.html
       - name: Image
-        link: ./index.html#small-image
+        link: ./index.html
