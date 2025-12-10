@@ -130,7 +130,41 @@
     </header>
     
     <div class="container">
-        <!-- Project 1 - Single Image -->
+
+                <!-- Project 1 - Work -->
+        <div class="project">
+                        <div class="media-gallery">
+                <video  controls autoplay loop muted>
+                    <source src="assets/cut-crop.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+             
+                <img src="assets/horse-short.gif" alt="Project 3 - Screenshot">
+                <img src="assets/feet.jpg" alt="Project 3 - Screenshot">
+            </div>
+            <div class="project-content">
+                <h2>Volume Rendering and Tools for Medical Data</h2>
+                <p>Working on medical imaging software, 
+                    optimizing and developing new features for DICOM data visualization across C++ and C# codebases.
+                     This includes utilisting both DirectX11 and OpenGL for real-time 3D visualization of medical scans and 
+                     providing tools for clinicians to modfy how the data is represented and viewed</p>
+                <p>One particualr tool Id like to highlift is an arbitrary polygon selection tool that lets users isolate and exclude specific regions.
+                     The system takes user-defined polygon points and uses an ear clipping algorithm to break the shape down into triangles.
+                     The triangles are then tranformed from screen space to 3D planes in world space to determine the zone to exclude from rendering.
+                     During the ray marching pass, each ray is tested against these triangular masks to exclude unwanted regions from the render, 
+                     giving clinicians precise control over what they're looking at.</p>
+                
+                <div class="tags">
+                    <span class="tag">Directx11</span>
+                    <span class="tag">OpenGL</span>
+                    <span class="tag">C++</span>
+                    <span class="tag">C#</span>
+                    <span class="tag">HLSL</span>
+                    <span class="tag">WPF</span>
+                </div>
+            </div>
+        </div>
+        <!-- Project 2 - Vulkan -->
         <div class="project">
                         <div class="media-gallery">
                 <video controls>
@@ -140,50 +174,71 @@
                 <img src="assets/highlight.png" alt="Project 3 - Screenshot">
             </div>
             <div class="project-content">
-                <h2>Project Title 1</h2>
-                <p>Brief description of your project. Explain what it does, what technologies you used, and what problem it solves.</p>
-                <div class="tags">
-                    <span class="tag">JavaScript</span>
-                    <span class="tag">React</span>
-                    <span class="tag">CSS</span>
+                <h2>Vulkan Physcially Based Rendering</h2>
+ <p>Built a PBR scene viewer in Vulkan from scratch. This involved setting up the entire rendering pipeline including synchronization, memory management, and descriptor set layouts. For the shading model, I implemented Cook-Torrance BRDF with Beckmann normal distribution function, Schlick's Fresnel approximation, and Lambertian diffuse for accurate material representation.</p>
+                <p>Added a multi-pass post-processing pipeline that renders the scene to an offscreen target first. 
+                    Later passes sample from this texture to apply effects like color grading and tone mapping. 
+                    Also built an object highlighting system that renders an object mask to a separate buffer,
+                     then applies a Sobel edge detection filter in the post-process shader. 
+                    The filter finds boundaries between masked objects and the scene, drawing a yellow highlight along the detected edges.</p>
+                     <div class="tags">
+                    <span class="tag">Vulkan</span>
+                    <span class="tag">C++</span>
+                    <span class="tag">HLSL</span>
                 </div>
             </div>
         </div>
         
         <!-- Project 2 - Multiple Images -->
-        <div class="project">
+<div class="project">
             <div class="media-gallery">
-                <img src="assets/grass.gif" alt="Project 2 - Image 1">
-                <img src="assets/grassVis.png" alt="Project 2 - Image 1">
-
+                <img src="assets/grass.gif" alt="Grass rendering with wind simulation">
+                <img src="assets/grassVis.png" alt="Perlin noise wind visualization">
             </div>
             <div class="project-content">
-                <h2>Project Title 2</h2>
-                <p>Another project description. Talk about the challenges you faced and how you overcame them.</p>
+                <h2>Procedural Grass Rendering with Bezier Curves - Tecnical paper implementation</h2>
+                <a href="grass.html">LIVE DEMO HERE</a>
+                <p> </p>
+                <p>Built a browser-based grass renderer that follows the paper 'Responsive Real-Time Grass Rendering for General 3D Scenes
+                    - Klemens Jahrmann' and a GDC talk on Ghost of Tsushima's grass system. 
+                    Each blade is modeled as a quadratic Bezier curve with three control points: P0 at the base, P1 at the tip,
+                     and P2 controlling the bend.
+                      The vertex shader evaluates these curves in real-time, offsetting vertices horizontally while maintaining blade length.
+                       Wind movement is simulated using multiple octaves of scrolling Perlin noise at different scales, and the Bezier derivative calculates normals for lighting.</p>
+                <p>Chose Three.js over WebGPU for better browser compatibility and devlopment, allowing for the project to be easily shared over the web. Used instanced rendering to draw thousands of grass blades in a single draw call, with the tradeoff being no frustum culling.
+                     Also added a cloud shadow effect by using Perlin noise to darken individual blades based on position, and built a debug UI to visualize wind intensity across the field.</p>
                 <div class="tags">
-                    <span class="tag">Python</span>
-                    <span class="tag">Machine Learning</span>
-                    <span class="tag">TensorFlow</span>
+                    <span class="tag">WebGL</span>
+                    <span class="tag">Three.js</span>
+                    <span class="tag">GLSL</span>
+                    <span class="tag">JavaScript</span>
+                    <span class="tag">Procedural Generation</span>
                 </div>
             </div>
         </div>
         
-        <!-- Project 3 - Mix of Images and Video -->
+       
+        <!-- Project 4 - terrain tess-->
         <div class="project">
             <div class="media-gallery">
-                <video controls>
+                <video controls autoplay loop muted>
                     <source src="assets/terrain short2.mp4" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
-                <img src="assets/terraingif.gif" alt="Project 3 - Screenshot">
+                <img src="assets/terraingif.gif" alt="Terrain tessellation visualization">
             </div>
             <div class="project-content">
-                <h2>Project Title 3</h2>
-                <p>Share what makes this project special and what you learned while building it.</p>
+                <h2>Terrain Tessellation with Dynamic LOD</h2>
+                <p>Heightmap-based terrain renderer using tessellation shaders to dynamically adjust triangle density based on distance to camera. Closer terrain gets more subdivisions for detail, while distant areas use fewer triangles for performance. Used geometry shaders to procedurally generate grass and flower billboards across the landscape.</p>
+                <p>Added a water layer using Gerstner wave equations with sinusoidal functions for realistic wave motion. 
+                    Implemented a foam effect by blending a secondary texture based on proximity to the terrain, 
+                    creating the appearance of water foam.</p>
                 <div class="tags">
-                    <span class="tag">HTML</span>
-                    <span class="tag">CSS</span>
-                    <span class="tag">WebGL</span>
+                    <span class="tag">OpenGL</span>
+                    <span class="tag">C++</span>
+                    <span class="tag">GLSL</span>
+                    <span class="tag">Tessellation</span>
+                    <span class="tag">ImGui</span>
                 </div>
             </div>
         </div>
