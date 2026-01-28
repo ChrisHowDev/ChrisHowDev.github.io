@@ -147,12 +147,12 @@
                 <p>Working on medical imaging software, 
                     optimizing and developing new features for DICOM data visualization across C++ and C# codebases.
                      This includes utilisting both DirectX11 and OpenGL for real-time 3D visualization of medical scans and 
-                     providing tools for clinicians to modify how the data is represented and viewed</p>
+                     providing tools for clinicians to modify how the data is represented and viewed.</p>
                 <p>One tool I'd like to highlight is an arbitrary polygon selection tool that lets users isolate and exclude specific regions.
                      The system takes user-defined polygon points and uses an ear clipping algorithm to break the shape down into triangles.
                      The triangles are then transformed from screen space to 3D planes in world space to determine the zone to exclude from rendering.
                      During the ray marching pass, each ray is tested against these triangular masks to exclude unwanted regions from the render, 
-                     giving clinicians precise control over what they're looking at.</p>
+                     giving clinicians precise control over what areas are 'cut' from the volumetric data.</p>
                 
                 <div class="tags">
                     <span class="tag">Directx11</span>
@@ -167,6 +167,10 @@
         <!-- Project 2 - Vulkan -->
         <div class="project">
                         <div class="media-gallery">
+                <video controls>
+                    <source src="assets/vulkan post.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
                 <video controls>
                     <source src="assets/vulkan short.mp4" type="video/mp4">
                     Your browser does not support the video tag.
