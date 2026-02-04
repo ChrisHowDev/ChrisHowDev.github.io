@@ -192,6 +192,34 @@
                 </div>
             </div>
         </div>
+                <div class="project">
+                        <div class="media-gallery">
+                <video controls>
+                    <source src="assets/Demo Lystem.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+               
+                <img src="assets/tree1.png" alt="Tree 1">        
+                <img src="assets/tree2.png" alt="Tree 2">
+            </div>
+            <div class="project-content">
+                <h2>Unreal Engine - Lystem</h2>
+ 
+                <p>I developed a fully procedural 3D L-system–based tree generator in Unreal Engine using C++. The system expands a formal grammar (axiom + production rules) into a sentence, then interprets it using a 3D turtle graphics algorithm to generate organic branching structures.
+
+The generator is designed with performance in mind. All branch segments and leaves are rendered using Instanced Static Mesh Components, allowing thousands of meshes to be drawn in only a few draw calls. This makes the system scalable and suitable for real-time use, even at higher iteration counts.
+
+Branch geometry is constructed at actor construction time (OnConstruction), avoiding per-frame overhead. A stack-based turtle state system enables efficient recursive branching, while quaternion-based local-axis rotations ensure stable orientation without gimbal lock. Branch thickness decreases based on stack depth, producing natural tapering at minimal computational cost.</p>
+                    <p>The result is a compact, efficient procedural vegetation system capable of generating dense bushes or complex trees while maintaining strong runtime performance.
+                     This tool can be used for rapid prototyping of vegetation assets or as a runtime foliage generator for dynamic environments.</p>
+
+<div class="tags">
+                    <span class="tag">Unreal Engine</span>
+                    <span class="tag">C++</span>
+                    <span class="tag">Blueprints</span>
+                </div>
+            </div>
+        </div>
         
         <!-- Project 2 - Multiple Images -->
 <div class="project">
