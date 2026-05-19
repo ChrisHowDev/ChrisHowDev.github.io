@@ -57,6 +57,9 @@ https://cdn.jsdelivr.net/npm/three-orbitcontrols@2.110.3/OrbitControls.min.js
   uniform float grassLean;
   uniform vec3 playerPos;
 
+  uniform sampler2D deformMap;
+  uniform float grassArea;
+
   attribute vec3 instancePosition;
 
   varying float groundRand;
@@ -186,10 +189,21 @@ https://cdn.jsdelivr.net/npm/three-orbitcontrols@2.110.3/OrbitControls.min.js
     vec3 awayFromPlayer = normalize(instancePosition - playerPos);
     vec3 combinedDirection = normalize(bladeDirection + awayFromPlayer * influence);
 
+
+    float halfSize = grassArea * 0.5;
+vec2 temp = instancePosition.xz;
+temp.y = -temp.y;
+vec2 uv = (temp + vec2(halfSize)) / (2.0 * halfSize);
+//vec2 uv = (instancePosition.xz / grassArea) + 0.5;
+float deform = texture2D(deformMap, uv).r * 20.;
+
+
+
     // Bezier control points
     vec3 p0 = vec3(0.0);
     vec3 p1 = bladeHeight;
-    vec3 p2 = (grassLeaning + 0.5) * leanIntesity * combinedDirection + bladeHeight;
+    vec3 p2 = ((grassLeaning+ deform + 0.5) * leanIntesity * combinedDirection + bladeHeight);
+   // vec3 p2 = (grassLeaning + 0.5) * leanIntesity * combinedDirection + bladeHeight;
     float t = clamp(pos.y, 0.0, 1.0);
 
     MakePersistentLength(p0, p1, p2, grassLength);
@@ -204,7 +218,10 @@ https://cdn.jsdelivr.net/npm/three-orbitcontrols@2.110.3/OrbitControls.min.js
     pos.y -= sin(hash(instancePosition.xz));
 
     // Normals
+vec3 widthDir = roty * vec3(1.0, 0.0, 0.0);
+
     vec3 tangent = bezierDerivative(p0, p1, p2, t);
+    
     vec3 newDirection = p1 - p2;
     vec3 sideVec = normalize(vec3(newDirection.z, newDirection.y, -newDirection.x));
     vec3 normal = normalize(cross(sideVec, tangent));
@@ -232,7 +249,7 @@ https://cdn.jsdelivr.net/npm/three-orbitcontrols@2.110.3/OrbitControls.min.js
 
     void main() {
       // Material colors
-      vec3 ambientColor = vec3(0.2, 0.4, 0.2);
+      vec3 ambientColor = vec3(0.1, 0.2, 0.1);
       vec3 diffuseColor = vec3(0.2, 0.5 + groundRand, 0.2);
 
       // Phong lighting parameters
@@ -333,7 +350,8 @@ const options = {
   grassLean: 10,
   windAngle: 0.0,
   grassArea: 50,
-  grassDensity: 10000
+  grassDensity: 10000,
+  showBrushTexture: false
 };
 
 // dat.GUI setup
@@ -343,7 +361,14 @@ gui.add(options, 'windSpeed', 0, 2.5).name('Wind Speed');
 gui.add(options, 'turbolance', 0, 0.1).name('Wind Turbolance');
 gui.add(options, 'grassLength', 0.5, 10).name('Grass Length');
 gui.add(options, 'grassLean', 0, 25).name('Grass Leaning');
-gui.add(options, 'grassArea', 50, 500).name('Grass Area').onChange(updateGrass);
+//gui.add(options, 'grassArea', 50, 500).name('Grass Area').onChange(updateGrass);
+
+gui.add(options, 'grassArea', 50, 500)
+  .name('Grass Area')
+  .onChange(() => {
+    updateGrass();
+    updateRTCamera();
+  });
 gui.add(options, 'grassDensity', 1000, 800000).name('Grass Blades').onChange(updateGrass);
 
 // Wind direction calculation
@@ -354,6 +379,8 @@ gui.add(options, 'windAngle', 0, 360).name('Wind Direction').onChange(() => {
   windDirection.y = Math.cos(radians);
   material.uniforms.windDirection.value.set(windDirection.x, windDirection.y);
 });
+
+gui.add(options, 'showBrushTexture').name('Show Brush Texture');
 
 // Load animated character
 let character, mixer, actions = {};
@@ -388,6 +415,13 @@ let speed = 0.25;
 let currentAction = null;
 let characterPos = new THREE.Vector3(0, 0, 0);
 
+const deformationRT = new THREE.WebGLRenderTarget(1024, 1024, {
+  minFilter: THREE.LinearFilter,
+  magFilter: THREE.LinearFilter,
+  format: THREE.RGBAFormat,
+  type: THREE.FloatType
+});
+
 // Shader material setup
 const material = new THREE.ShaderMaterial({
   vertexShader: vertexShader,
@@ -402,12 +436,15 @@ const material = new THREE.ShaderMaterial({
     turbolance: { value: options.turbolance },
     grassLean: { value: options.grassLean },
     windDirection: { value: new THREE.Vector2(1.0, 1.0) },
-    playerPos: { value: characterPos }
+    playerPos: { value: characterPos },
+     deformMap: { value: deformationRT.texture } ,
+     grassArea: { value: options.grassArea },
+    
   }
 });
 
 // Grass geometry + instancing
-const grassGeometry = new THREE.PlaneGeometry(0.17, 1, 1, 12);
+const grassGeometry = new THREE.PlaneGeometry(0.17, 1, 1, 30);
 let instancedMesh;
 
 function updateGrass() {
@@ -455,6 +492,114 @@ scene.add(ambientLight);
 // Animation loop
 const clock = new THREE.Clock();
 
+
+
+deformationRT.texture.wrapS = THREE.ClampToEdgeWrapping;
+deformationRT.texture.wrapT = THREE.ClampToEdgeWrapping;
+
+const rtScene = new THREE.Scene();
+
+const orthoSize = options.grassArea * 0.5;
+
+const rtCamera = new THREE.OrthographicCamera(
+  -orthoSize,
+   orthoSize,
+   orthoSize,
+  -orthoSize,
+   0.1,
+   1000
+);
+
+rtCamera.position.set(0, 100, 0);
+rtCamera.lookAt(0, 0, 0);
+rtCamera.up.set(0, 0, -1);
+
+const brushMaterial = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  depthTest: false,
+  blending: THREE.AdditiveBlending,
+
+  uniforms: {
+    brushStrength: { value: 1.0 }
+  },
+
+  vertexShader: `
+    varying vec2 vUv;
+
+    void main() {
+      vUv = uv;
+
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+
+  fragmentShader: `
+varying vec2 vUv;
+
+uniform float brushStrength;
+
+void main() {
+
+    vec2 centered = vUv - 0.5;
+
+    float d = length(centered);
+
+    float circle = 1.0 - smoothstep(0.0, 0.9, d);
+
+    circle *= circle;
+
+    if (circle < 0.01)
+        discard;
+
+    gl_FragColor = vec4(vec3(circle * 0.4), 1.0);
+}
+  `
+});
+
+function updateRTCamera() {
+
+  const orthoSize = options.grassArea * 0.5;
+
+  rtCamera.left = -orthoSize;
+  rtCamera.right = orthoSize;
+  rtCamera.top = orthoSize;
+  rtCamera.bottom = -orthoSize;
+
+  rtCamera.updateProjectionMatrix();
+
+  material.uniforms.grassArea.value = options.grassArea;
+
+  renderer.setRenderTarget(deformationRT);
+  renderer.clear();
+  renderer.setRenderTarget(null);
+}
+
+const brushMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(5, 5),
+  brushMaterial
+);
+
+brushMesh.rotation.x = -Math.PI * 0.5;
+
+rtScene.add(brushMesh);
+
+renderer.autoClear = false;
+
+const debugMaterial = new THREE.MeshBasicMaterial({
+  map: deformationRT.texture
+});
+
+const debugQuad = new THREE.Mesh(
+  new THREE.PlaneGeometry(2, 2),
+  debugMaterial
+);
+
+const debugScene = new THREE.Scene();
+const debugCamera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+debugScene.add(debugQuad);
+
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
@@ -464,6 +609,7 @@ function animate() {
 
 // Character Movement relative to camera
   if (character) {
+
       const moveVector = new THREE.Vector3();
       const forward = new THREE.Vector3();
       const right = new THREE.Vector3();
@@ -483,6 +629,17 @@ function animate() {
       if (keys.d) moveVector.add(right);
 
       if (moveVector.lengthSq() > 0) {
+          renderer.setRenderTarget(deformationRT);
+
+  // IMPORTANT:
+  // do NOT clear
+  // renderer.clear();
+
+  renderer.render(rtScene, rtCamera);
+
+  renderer.setRenderTarget(null);
+renderer.setRenderTarget(null);
+renderer.clear();
           moveVector.normalize();
           character.position.add(moveVector.multiplyScalar(speed));
           character.lookAt(character.position.clone().add(moveVector)); // Face move direction
@@ -490,6 +647,9 @@ function animate() {
       } else {
           playAnimation("Idle");
       }
+
+
+      
   }
 
   // Update character position uniform
@@ -504,7 +664,43 @@ function animate() {
   material.uniforms.time.value = clock.getElapsedTime();
   material.uniforms.cameraPosition.value.copy(camera.position);
 
+    brushMesh.position.set(
+    characterPos.x,
+    0.1,
+    characterPos.z
+  );
+
+  // Render into deformation target
+
+
+
+
+
   renderer.render(scene, camera);
+
+
+ if (options.showBrushTexture) {
+
+  renderer.clearDepth();
+
+  const size = 250;
+
+  renderer.setScissorTest(true);
+
+  renderer.setViewport(20, 20, size, size);
+  renderer.setScissor(20, 20, size, size);
+
+  renderer.render(debugScene, debugCamera);
+
+  renderer.setScissorTest(false);
+
+  renderer.setViewport(
+    0,
+    0,
+    window.innerWidth,
+    window.innerHeight
+  );
+}
 }
 
 animate();
