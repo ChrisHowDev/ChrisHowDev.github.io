@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>Projected Shader Onto GLTF + Diffuse Lighting</title>
+
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: blue;
+  }
+
+  canvas {
+    display: block;
+  }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "GLTFLoader": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/GLTFLoader.js",
+    "OrbitControls": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js",
+    "GUI": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/lil-gui.module.min.js"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<script type="module">
+
+import * as THREE from 'three';
+import { GLTFLoader } from 'GLTFLoader';
+import { OrbitControls } from 'OrbitControls';
+import { GUI } from 'GUI';
+
+//
+// RENDERER
+//
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true
+});
+
+renderer.setSize(
+  window.innerWidth,
+  window.innerHeight
+);
+
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio, 2)
+);
+
+document.body.appendChild(renderer.domElement);
+
+
+
+const scene = new THREE.Scene();
+
+scene.background =
+  new THREE.Color(0x000000);
+
+
+
+const camera =
+  new THREE.PerspectiveCamera(
+    45,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
+
+camera.position.set(0, 1.5, 5);
+
+const controls =
+  new OrbitControls(
+    camera,
+    renderer.domElement
+  );
+
+controls.enableDamping = true;
+
+
+
+const ambientLight =
+  new THREE.AmbientLight(
+    0xffffff,
+    0.25
+  );
+
+scene.add(ambientLight);
+
+const dirLight =
+  new THREE.DirectionalLight(
+    0xffffff,
+    3.0
+  );
+
+dirLight.position.set(5, 5, 5);
+
+scene.add(dirLight);
+
+
+const projectorCamera =
+  new THREE.PerspectiveCamera(
+    35,
+    1,
+    0.1,
+    20
+  );
+
+projectorCamera.position.set(
+  2,
+  2,
+  2
+);
+
+projectorCamera.lookAt(0, 0, 0);
+
+scene.add(projectorCamera);
+
+
+
+const projectorHelper =
+  new THREE.CameraHelper(
+    projectorCamera
+  );
+
+scene.add(projectorHelper);
+
+
+
+const gui = new GUI();
+
+const projectorSettings = {
+
+  x: 2,
+  y: 2,
+  z: 2,
+
+  targetX: 0,
+  targetY: 0,
+  targetZ: 0,
+
+  fov: 35,
+
+  ambient: 0.25,
+  diffuse: 0.5
+
+};
+
+const folder =
+  gui.addFolder(
+    'Projector Camera'
+  );
+
+
+
+folder.add(
+  projectorSettings,
+  'targetX',
+  -5,
+  5,
+  0.01
+);
+
+folder.add(
+  projectorSettings,
+  'targetY',
+  -5,
+  5,
+  0.01
+);
+
+folder.add(
+  projectorSettings,
+  'targetZ',
+  -5,
+  5,
+  0.01
+);
+
+folder.add(
+  projectorSettings,
+  'fov',
+  10,
+  120,
+  1
+);
+
+
+
+folder.open();
+
+const rtSize = 1024;
+
+const renderTarget =
+  new THREE.WebGLRenderTarget(
+    rtSize,
+    rtSize
+  );
+
+//
+// SHADER SCENE
+//
+
+const shaderScene =
+  new THREE.Scene();
+
+const shaderCamera =
+  new THREE.OrthographicCamera(
+    -1,
+    1,
+    1,
+    -1,
+    0,
+    1
+  );
+
+//
+// PROCEDURAL SHADER
+//
+
+const shaderUniforms = {
+
+  uTime: {
+    value: 0
+  }
+
+};
+
+const proceduralMaterial =
+  new THREE.ShaderMaterial({
+
+    uniforms: shaderUniforms,
+
+    vertexShader: /* glsl */`
+
+      varying vec2 vUv;
+
+      void main() {
+
+        vUv = uv;
+
+        gl_Position =
+          vec4(position, 1.0);
+
+      }
+
+    `,
+
+    fragmentShader: /* glsl */`
+
+      precision highp float;
+
+      uniform float uTime;
+
+      varying vec2 vUv;
+
+      vec2 random2(vec2 p) {
+
+        return fract(
+          sin(
+            vec2(
+              dot(p, vec2(127.1,311.7)),
+              dot(p, vec2(269.5,183.3))
+            )
+          ) * 43758.5453
+        );
+
+      }
+
+      void main() {
+
+        vec2 uv = vUv;
+
+        uv +=
+          0.02 *
+          sin(uv.yx * 10.0 + uTime);
+
+        uv +=
+          0.08 *
+          sin(uv.yx * 6.0 + uTime * 0.7);
+
+        uv +=
+          0.05 *
+          cos(uv.yx * 12.0 + uTime * 1.3);
+
+        uv +=
+          0.03 *
+          sin(uv.yx * 24.0 + uTime * 2.0);
+
+        vec2 scaledUV =
+          uv * 20.0;
+
+        vec2 integerUV =
+          floor(scaledUV);
+
+        vec2 subFractionUV =
+          fract(scaledUV);
+
+        float m_dist = 1.0;
+
+        for (int y = -1; y <= 1; y++) {
+
+          for (int x = -1; x <= 1; x++) {
+
+            vec2 neighbor =
+              vec2(float(x), float(y));
+
+            vec2 point =
+              random2(integerUV + neighbor);
+
+            point =
+              0.5 + 0.5 *
+              sin(
+                uTime +
+                6.2831 * point
+              );
+
+            vec2 diff =
+              neighbor +
+              point -
+              subFractionUV;
+
+            float dist =
+              length(diff);
+
+            m_dist =
+              min(m_dist, dist);
+
+          }
+
+        }
+
+
+        vec2 centeredUV = vUv - 0.5;
+
+        float fade =
+            1.0 -
+            smoothstep(
+                0.3,
+                0.5,
+                length(centeredUV ) 
+            );
+            
+        float c =
+          pow(m_dist, 8.0);
+
+        gl_FragColor =
+          vec4(vec3( c * fade), 1.0);
+
+      }
+
+    `
+
+  });
+
+
+
+const quad =
+  new THREE.Mesh(
+
+    new THREE.PlaneGeometry(2, 2),
+
+    proceduralMaterial
+
+  );
+
+shaderScene.add(quad);
+
+
+
+const projectedMaterial =
+  new THREE.ShaderMaterial({
+
+    uniforms: {
+
+      uTexture: {
+        value: renderTarget.texture
+      },
+
+      uProjectorMatrix: {
+        value: new THREE.Matrix4()
+      },
+
+      uLightDirection: {
+        value: new THREE.Vector3(
+          1,
+          1,
+          1
+        ).normalize()
+      },
+
+      uAmbientStrength: {
+        value: 0.5
+      },
+
+      uDiffuseStrength: {
+        value: 1.0
+      }
+
+    },
+
+    vertexShader: /* glsl */`
+
+      varying vec4 vProjCoord;
+      varying vec3 vNormal;
+
+      uniform mat4 uProjectorMatrix;
+
+      void main() {
+
+        vec4 worldPosition =
+          modelMatrix *
+          vec4(position, 1.0);
+
+        vProjCoord =
+          uProjectorMatrix *
+          worldPosition;
+
+        vNormal =
+          normalize(
+            mat3(modelMatrix) *
+            normal
+          );
+
+        gl_Position =
+          projectionMatrix *
+          modelViewMatrix *
+          vec4(position, 1.0);
+
+      }
+
+    `,
+
+    fragmentShader: /* glsl */`
+
+      precision highp float;
+
+      uniform sampler2D uTexture;
+
+      uniform vec3 uLightDirection;
+
+      uniform float uAmbientStrength;
+      uniform float uDiffuseStrength;
+
+      varying vec4 vProjCoord;
+      varying vec3 vNormal;
+
+      void main() {
+
+        vec3 projected =
+          vProjCoord.xyz /
+          vProjCoord.w;
+
+        vec2 uv =
+          projected.xy * 0.5 + 0.5;
+
+    
+
+
+        vec2 center = vec2(0.5);
+
+        vec2 dir = uv - center;
+
+        float strength = 0.015;
+
+        vec3 tex;
+
+        tex.r = texture2D( uTexture, uv + dir * strength).r;
+
+        tex.g = texture2D( uTexture,uv ).g;
+
+        tex.b = texture2D(uTexture,uv - dir * strength ).b;
+        if (
+          uv.x < 0.0 ||
+          uv.x > 1.0 ||
+          uv.y < 0.0 ||
+          uv.y > 1.0
+          ) {
+
+          tex = vec3(0.);
+                  
+          };
+
+      
+        vec3 normal =
+          normalize(vNormal);
+
+        vec3 lightDir =
+          normalize(uLightDirection);
+
+        float diffuse =
+          max(
+            dot(normal, lightDir),
+            0.0
+          );
+
+        vec3 ambient =
+          vec3(
+          uAmbientStrength);
+
+        vec3 diffuseColor =
+          vec3(
+          diffuse *
+          uDiffuseStrength);
+
+        vec3 finalColor =
+          0.1 +
+          diffuseColor + tex * diffuse * 2.;
+
+        gl_FragColor =
+          vec4(finalColor, 1.0);
+
+      }
+
+    `
+
+  });
+
+
+const loader =
+  new GLTFLoader();
+
+loader.load(
+
+  'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
+
+  (gltf) => {
+
+    gltf.scene.scale.set(
+      0.2,
+      0.2,
+      0.2
+    );
+
+    gltf.scene.traverse((child) => {
+
+      if (child.isMesh) {
+
+        child.material =
+          projectedMaterial;
+
+      }
+
+    });
+
+    scene.add(gltf.scene);
+
+  }
+
+);
+
+
+
+const sphere =
+  new THREE.Mesh(
+
+    new THREE.SphereGeometry(
+      1,
+      128,
+      128
+    ),
+
+    projectedMaterial
+
+  );
+
+sphere.position.x = -2;
+
+scene.add(sphere);
+
+
+
+const projectorMatrix =
+  new THREE.Matrix4();
+
+
+
+const clock =
+  new THREE.Clock();
+
+
+
+const bgScene = new THREE.Scene();
+
+const bgCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+const bgMaterial = new THREE.ShaderMaterial({
+
+  depthWrite: false,
+  depthTest: false,
+
+  vertexShader: `
+    void main() {
+      gl_Position = vec4(position, 1.0);
+    }
+  `,
+
+  fragmentShader: `
+    precision highp float;
+
+    uniform vec2 uResolution;
+
+    void main() {
+
+      vec2 uv = gl_FragCoord.xy / uResolution;
+
+      vec3 top = vec3(0.02, 0.02, 0.05);
+      vec3 bottom = vec3(0.18, 0.10, 0.25);
+
+      vec3 col = mix(bottom, top, uv.y);
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+
+  uniforms: {
+    uResolution: { value: new THREE.Vector2() }
+  }
+
+});
+
+const bgMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 2000),
+  bgMaterial
+);
+scene.background = new THREE.Color(0x101020);
+bgScene.add(bgMesh);
+function animate() {
+
+  requestAnimationFrame(animate);
+
+  controls.update();
+
+  shaderUniforms.uTime.value =
+    clock.getElapsedTime();
+
+
+
+  renderer.setRenderTarget(
+    renderTarget
+  );
+
+  renderer.render(
+    shaderScene,
+    shaderCamera
+  );
+
+
+
+  projectorCamera.position.set(
+
+    projectorSettings.x,
+    projectorSettings.y,
+    projectorSettings.z
+
+  );
+
+  projectorCamera.fov =
+    projectorSettings.fov;
+
+  projectorCamera.updateProjectionMatrix();
+
+  projectorCamera.lookAt(
+
+    projectorSettings.targetX,
+    projectorSettings.targetY,
+    projectorSettings.targetZ
+
+  );
+
+
+
+  projectedMaterial.uniforms
+    .uAmbientStrength.value =
+    projectorSettings.ambient;
+
+  projectedMaterial.uniforms
+    .uDiffuseStrength.value =
+    projectorSettings.diffuse;
+
+  projectorMatrix
+    .copy(
+      projectorCamera.projectionMatrix
+    )
+    .multiply(
+      projectorCamera.matrixWorldInverse
+    );
+
+  projectedMaterial.uniforms
+    .uProjectorMatrix.value
+    .copy(projectorMatrix);
+
+
+  projectorHelper.update();
+
+
+  renderer.setRenderTarget(null);
+
+
+  bgMaterial.uniforms.uResolution.value.set(
+  window.innerWidth,
+  window.innerHeight
+  );
+
+  renderer.clear();
+renderer.render(bgScene, bgCamera);
+
+  renderer.clearDepth();
+
+renderer.render(scene,camera);
+
+}
+
+animate();
+
+
+
+window.addEventListener(
+  'resize',
+  () => {
+
+    renderer.setSize(
+      window.innerWidth,
+      window.innerHeight
+    );
+
+    camera.aspect =
+      window.innerWidth /
+      window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+  }
+);
+
+</script>
+
+</body>
+</html>
