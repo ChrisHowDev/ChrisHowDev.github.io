@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hologram</title>
+
+<style>
+  body { margin:0; overflow:hidden; background:#000; }
+  canvas { display:block; }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "GLTFLoader": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/GLTFLoader.js",
+    "OrbitControls": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js",
+    "RGBELoader": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/RGBELoader.js",
+    "GUI": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/libs/lil-gui.module.min.js",
+    "EffectComposer": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/EffectComposer.js",
+    "RenderPass": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/RenderPass.js",
+    "ShaderPass": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/ShaderPass.js",
+    "UnrealBloomPass": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/UnrealBloomPass.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'GLTFLoader';
+import { OrbitControls } from 'OrbitControls';
+import { RGBELoader } from 'RGBELoader';
+import { GUI } from 'GUI';
+import { EffectComposer } from 'EffectComposer';
+import { RenderPass } from 'RenderPass';
+import { ShaderPass } from 'ShaderPass';
+import { UnrealBloomPass } from 'UnrealBloomPass';
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  45,
+  window.innerWidth/window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(0, 0.5, 4);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+
+let environmentMap;
+
+// Load HDR environment
+new RGBELoader().load(
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/forest_slope_1k.hdr',
+  (hdr) => {
+    environmentMap = pmrem.fromEquirectangular(hdr).texture;
+    scene.background = environmentMap;
+    scene.environment = environmentMap;
+    hdr.dispose();
+    pmrem.dispose();
+  }
+);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+const dir = new THREE.DirectionalLight(0xffffff, 2);
+dir.position.set(5, 5, 5);
+scene.add(dir);
+
+const uniforms = {
+  uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+  uTime: { value: 0 },
+  uFresnelPower: { value: 1.0 },
+  uBaseColor: { value: new THREE.Vector3(0.9, 0.75, 0.1) },
+  uRimColor: { value: new THREE.Vector3(1.0, 0.2, 0.0) },
+  envMap: { value: null },
+  cameraPos: { value: new THREE.Vector3() },
+  uDitherDiscard: {value: 0.1},
+  uTransparency: {value: 1},
+  uPulseSpeed: {value: 0.5},
+  uPulseThickness: {value: 0.1},
+  uTextureScaling: {value: 10}
+};
+
+const guiParams = {
+  baseColor: {
+    r: uniforms.uBaseColor.value.x,
+    g: uniforms.uBaseColor.value.y,
+    b: uniforms.uBaseColor.value.z
+  },
+
+  rimColor: {
+    r: uniforms.uRimColor.value.x,
+    g: uniforms.uRimColor.value.y,
+    b: uniforms.uRimColor.value.z
+  }
+};
+
+const hologramMaterial = new THREE.ShaderMaterial({
+  transparent: true,
+  alphaTest: 0.0,          // enable transparency
+  depthWrite: false,
+  depthTest: true,
+  blending: THREE.AdditiveBlending,
+  side: THREE.FrontSide,
+  polygonOffset: true,
+  polygonOffsetFactor: -1,
+  polygonOffsetUnits: -1,
+  uniforms,
+  vertexShader: `
+    varying vec3 vWorldPosition;
+    varying vec3 vWorldNormal;
+    varying vec3 vViewDir;
+
+    void main(){
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPos.xyz;
+      vWorldNormal = normalize(mat3(modelMatrix) * normal);
+      vViewDir = normalize(cameraPosition - vWorldPosition);
+
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+
+    uniform vec2 uResolution;
+    uniform float uTime;
+    uniform float uFresnelPower;
+    uniform vec3 uBaseColor;
+    uniform vec3 uRimColor;
+    uniform samplerCube envMap;
+    uniform vec3 cameraPos;
+
+    uniform float uDitherDiscard;
+    uniform float uTransparency;
+    uniform float uPulseSpeed;
+    uniform float uPulseThickness;
+    uniform float uTextureScaling;
+
+    varying vec3 vWorldPosition;
+    varying vec3 vWorldNormal;
+    varying vec3 vViewDir;
+
+    float bayer4x4(vec2 p)
+    {
+      int x = int(mod(p.x, 4.0));
+      int y = int(mod(p.y, 4.0));
+      int i = x + y * 4;
+
+      float m[16];
+      m[0]=0.;  m[1]=8.;  m[2]=2.;  m[3]=10.;
+      m[4]=12.; m[5]=4.;  m[6]=14.; m[7]=6.;
+      m[8]=3.;  m[9]=11.; m[10]=1.; m[11]=9.;
+      m[12]=15.;m[13]=7.; m[14]=13.;m[15]=5.;
+
+      return m[i] / 16.0;
+    }
+
+    vec2 random2(vec2 p)
+    {
+      return fract(
+        sin(
+          vec2(
+            dot(p, vec2(127.1, 311.7)),
+            dot(p, vec2(269.5, 183.3))
+          )
+        ) * 43758.5453
+      );
+    }
+
+    void main()
+    {
+      vec3 N = normalize(vWorldNormal);
+      vec3 V = normalize(vViewDir);
+
+      // Fresnel effect
+      float fresnel = pow(1.0 - max(dot(N, V), 0.0), uFresnelPower);
+
+      // Scan line effect
+      float scan = sin(vWorldPosition.y * 300.0 - uTime * 32.0);
+      scan = smoothstep(0.2, 1.0, scan);
+
+      // Base color + rim color blend with fresnel
+      vec3 color = mix(uBaseColor, uRimColor, fresnel);
+      color += scan * 0.15;
+
+      // Cylindrical UV mapping for streams
+      vec2 streamUV = vec2(
+        atan(vWorldPosition.z, vWorldPosition.x) / 6.28318530718,
+        vWorldPosition.y
+      );
+
+      float scale = uTextureScaling;
+      vec2 scaledUV = streamUV * scale;
+      vec2 integerUV = floor(scaledUV);
+      vec2 subFractionUV = fract(scaledUV);
+
+      float trail = 0.0;
+      float head = 0.0;
+
+      for(int y=-1; y<=1; y++) {
+        for(int x=-1; x<=1; x++) {
+          vec2 neighbor = vec2(float(x), float(y));
+          vec2 seed = random2(integerUV + neighbor);
+          float speed = mix(0.15, 0.35, seed.x);
+
+          // Head computation
+          vec2 particle = seed;
+          particle.y = fract(seed.y + uTime * 5.0 * speed);
+          vec2 headDiff = neighbor + particle - subFractionUV;
+          float headDist = length(headDiff);
+          head += exp(-120.0 * headDist);
+
+          // Trail computation
+          float localTrail = 0.0;
+          for(int i=0; i<32; i++) {
+            float age = float(i) / 32.0;
+            vec2 point = seed;
+            point.y = fract(seed.y + (uTime * 5.0 - age * 3.0) * speed);
+            vec2 diff = neighbor + point - subFractionUV;
+            diff.x *= 10.0;
+            float d = length(diff);
+            localTrail += exp(-40.0 * d) * pow(1.0 - age, 1.5);
+          }
+          trail += localTrail;
+        }
+      }
+
+      vec3 streamColor = normalize(uBaseColor + 0.0001) * length(uBaseColor) * 8.0;
+      color += streamColor * trail * 0.8;
+      color += streamColor * head * 2.5;
+
+      vec3 I = normalize(vWorldPosition - cameraPos);
+      vec3 R = reflect(I, N);
+
+      vec3 envColor = textureCube(envMap, R).rgb;
+      color = mix(color, envColor, fresnel * 0.6);
+
+      // Dither alpha using Bayer pattern
+      float alpha = bayer4x4(floor(gl_FragCoord.xy * 0.5));
+
+      float pulseFront = fract(uTime * uPulseSpeed);
+      float pulseWidth = uPulseThickness;
+
+      float pulse =
+          smoothstep(
+              pulseFront - pulseWidth,
+              pulseFront,
+              fresnel
+          ) *
+          (
+          1.0 -
+          smoothstep(
+              pulseFront,
+              pulseFront + pulseWidth,
+              fresnel
+          )
+          );
+
+
+      // Multiply alpha to fresnel to create nice transparency
+      alpha *= fresnel * uTransparency;
+
+      if(alpha < uDitherDiscard) discard;
+
+      color += color * pulse * 12.0;
+
+      gl_FragColor = vec4(color * 2.0, alpha);
+    }
+  `
+});
+
+const depthMaterial = new THREE.MeshBasicMaterial({ colorWrite: false });
+depthMaterial.depthWrite = true;
+depthMaterial.depthTest = true;
+
+let hologramModel = null;
+let depthModel = null;
+
+new GLTFLoader().load(
+  'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf',
+  (gltf) => {
+    depthModel = gltf.scene.clone(true);
+
+    depthModel.traverse(o => {
+      if (o.isMesh) {
+        o.material = depthMaterial;
+        o.renderOrder = 1;
+        o.layers.disable(1);
+      }
+    });
+    
+    scene.add(depthModel);
+
+    hologramModel = gltf.scene;
+
+    hologramModel.traverse(o => {
+      if (o.isMesh) {
+        o.material = hologramMaterial;
+        o.renderOrder = 1;
+        o.layers.enable(1);
+      }
+    });
+
+    
+    scene.add(hologramModel);
+  }
+);
+
+// Simple environment shapes: ground + trees
+
+const textureLoader = new THREE.TextureLoader();
+
+const grassTexture = textureLoader.load(
+  'https://threejs.org/examples/textures/terrain/grasslight-big.jpg'
+);
+
+grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
+grassTexture.repeat.set(10, 10);
+grassTexture.colorSpace = THREE.SRGBColorSpace;
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 200),
+  new THREE.MeshStandardMaterial({
+    color: 0x1f7a2e,
+    roughness: 1,
+    map: grassTexture,
+  })
+);
+
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -1;
+scene.add(ground);
+
+function createTree(x, z, scale = 1) {
+  const tree = new THREE.Group();
+
+  // trunk
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.2, 1.5, 6),
+    new THREE.MeshStandardMaterial({ color: 0x5a3a1b })
+  );
+  trunk.position.y = 0.75-1;
+
+  // leaves
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(0.9, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x1e8a3a })
+  );
+  leaves.position.y = 1.8-1;
+
+  tree.add(trunk);
+  tree.add(leaves);
+
+  tree.position.set(x, 0, z);
+  tree.scale.setScalar(scale);
+
+  return tree;
+}
+
+for (let i = 0; i < 60; i++) {
+  const x = (Math.random() - 0.5) * 120;
+  const z = (Math.random() - 0.5) * 120;
+
+  if (Math.abs(x) < 8 && Math.abs(z) < 8) continue;
+
+  scene.add(createTree(x, z, 0.8 + Math.random() * 1.8));
+}
+
+
+const bloomComposer = new EffectComposer(renderer);
+bloomComposer.renderToScreen = false;
+
+bloomComposer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.6, 0.05
+);
+
+bloomComposer.addPass(bloomPass);
+
+
+const finalComposer = new EffectComposer(renderer);
+finalComposer.addPass(new RenderPass(scene, camera));
+
+const compositePass = new ShaderPass({
+  uniforms: {
+    baseTexture: { value: null },
+    bloomTexture: { value: bloomComposer.renderTarget2.texture },
+    aberration: { value: 0.0002 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main(){
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D baseTexture;
+    uniform sampler2D bloomTexture;
+    uniform float aberration;
+
+    varying vec2 vUv;
+
+    void main(){
+      vec2 px = vec2(aberration, 0.0);
+
+      float r = texture2D(baseTexture, vUv + px * 12.0).r;
+      float g = texture2D(baseTexture, vUv).g;
+      float b = texture2D(baseTexture, vUv - px * 12.0).b;
+
+      vec3 bloomCA = vec3(r,g,b);
+
+      vec3 base = texture2D(baseTexture, vUv).rgb;
+
+      gl_FragColor = vec4(base  + bloomCA * 0.8, 1.0);
+    }
+  `
+});
+
+finalComposer.addPass(compositePass);
+
+const darkMaterial = new THREE.MeshBasicMaterial({ color:0x000000 });
+const materials = {};
+
+function darken(obj){
+  if(!obj.isMesh) return;
+  if(obj.material === depthMaterial) return;
+  if(!obj.layers.test(camera.layers)){
+    materials[obj.uuid] = obj.material;
+    obj.material = darkMaterial;
+  }
+}
+
+function restore(obj){
+  if(materials[obj.uuid]){
+    obj.material = materials[obj.uuid];
+    delete materials[obj.uuid];
+  }
+}
+
+const gui = new GUI();
+
+gui
+  .add(uniforms.uFresnelPower, 'value', 0.1, 10, 0.1)
+  .name('Fresnel power');
+
+gui
+  .add(uniforms.uTransparency, 'value', 0.0, 10, 0.01)
+  .name('Transparency factor');
+
+gui
+  .add(uniforms.uDitherDiscard, 'value', 0.0, 1, 0.01)
+  .name('Dither discard threshold');
+
+gui
+  .add(uniforms.uPulseSpeed, 'value', 0.0, 5, 0.1)
+  .name('Pulse speed');
+
+gui
+  .add(uniforms.uPulseThickness, 'value', 0.0, 0.5, 0.01)
+  .name('Pulse thichness');
+
+gui
+  .add(uniforms.uTextureScaling, 'value', 0.0, 20, 0.1)
+  .name('Texture scaling');  
+
+const colorParams = {
+  baseColor: '#e6bf1a',
+  rimColor: '#ff3300'
+};
+
+gui.addColor(colorParams, 'baseColor')
+.onChange(v => {
+  const c = new THREE.Color(v);
+  uniforms.uBaseColor.value.set(c.r, c.g, c.b);
+});
+
+gui.addColor(colorParams, 'rimColor')
+.onChange(v => {
+  const c = new THREE.Color(v);
+  uniforms.uRimColor.value.set(c.r, c.g, c.b);
+});
+const clock = new THREE.Clock();
+
+function render(){
+  requestAnimationFrame(render);
+
+  controls.update();
+
+  uniforms.uTime.value = clock.getElapsedTime();
+  uniforms.cameraPos.value.copy(camera.position);
+
+
+  camera.layers.set(1);
+
+  camera.layers.set(0);
+  camera.layers.enable(1);
+
+  compositePass.uniforms.baseTexture.value = finalComposer.readBuffer.texture;
+
+ finalComposer.render();
+}
+
+render();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  bloomComposer.setSize(window.innerWidth, window.innerHeight);
+  finalComposer.setSize(window.innerWidth, window.innerHeight);
+
+  uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
